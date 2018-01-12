@@ -452,6 +452,23 @@ ngx_open_listening_sockets(ngx_cycle_t *cycle)
 
             s = ngx_socket(ls[i].sockaddr->sa_family, ls[i].type, 0);
 
+            /* TODO: probably should skip if not linux */
+            if (ls[i].sockaddr->type == SOCK_STREAM) {
+                char *cong_opt = 'tv';
+                size_t cong_optlen = strlen(cong_opt);
+                if (setsockopt(s, IPPROTO_TCP, TCP_CONGESTION, cong_opt, &cong_optlen) == -1) {
+                    ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                  "setsockopt(TCP_CONGESTION) %V failed",
+                                  &ls[i].addr_text);
+                    if (ngx_close_socket(s) == -1) {
+                        ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
+                                      ngx_close_socket_n " %V failed",
+                                      &ls[i].addr_text);
+                    }
+                    return NGX_ERROR;
+                }
+            }
+
             if (s == (ngx_socket_t) -1) {
                 ngx_log_error(NGX_LOG_EMERG, log, ngx_socket_errno,
                               ngx_socket_n " %V failed", &ls[i].addr_text);
